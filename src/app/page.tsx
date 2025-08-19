@@ -1,95 +1,84 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import HomeContent from "../components/HomeContent";
+import type { DogBreed, CatBreed, DogImageApi } from "../types/breeds";
+import { DOG_API_KEY, CAT_API_KEY } from "../constants/api";
 
-export default function Home() {
+async function fetchDogBreeds() {
+  const res = await fetch(
+    "https://api.thedogapi.com/v1/images/search?limit=30&has_breeds=1",
+    {
+      headers: {
+        "x-api-key": DOG_API_KEY,
+      },
+      cache: "no-store",
+    }
+  );
+  if (!res.ok) throw new Error("Failed to fetch dog breeds");
+  const dogData: DogImageApi[] = await res.json();
+  const dogWithBreeds: DogBreed[] = dogData
+    .filter((img) => img.breeds && img.breeds.length > 0)
+    .sort(() => 0.5 - Math.random())
+    .slice(0, 12)
+    .map((img) => ({
+      id: img.id,
+      breedId: img.breeds[0].id,
+      name: img.breeds[0].name,
+      imageUrl: img.url,
+    }));
+  return dogWithBreeds;
+}
+
+async function fetchCatBreeds() {
+  const res = await fetch("https://api.thecatapi.com/v1/breeds", {
+    headers: {
+      "x-api-key": CAT_API_KEY,
+    },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Failed to fetch cat breeds");
+  const catData: CatBreed[] = await res.json();
+  // For each breed, fetch an image using /images/search?breed_id=...
+  const catWithImages = await Promise.all(
+    catData.slice(0, 12).map(async (breed) => {
+      let imageUrl = breed.image?.url;
+      if (!imageUrl) {
+        const imgRes = await fetch(
+          `https://api.thecatapi.com/v1/images/search?breed_id=${breed.id}&limit=1`,
+          {
+            headers: {
+              "x-api-key": CAT_API_KEY,
+            },
+            cache: "no-store",
+          }
+        );
+        if (imgRes.ok) {
+          const imgData = await imgRes.json();
+          if (imgData.length > 0) {
+            imageUrl = imgData[0].url;
+          }
+        }
+      }
+      return imageUrl
+        ? { id: breed.id, name: breed.name, image: { url: imageUrl } }
+        : null;
+    })
+  );
+  return catWithImages.filter(Boolean) as CatBreed[];
+}
+
+export default async function Home() {
+  let dogBreeds: DogBreed[] = [];
+  let catBreeds: CatBreed[] = [];
+  let error: string | null = null;
+  try {
+    [dogBreeds, catBreeds] = await Promise.all([
+      fetchDogBreeds(),
+      fetchCatBreeds(),
+    ]);
+  } catch (e) {
+    error = e instanceof Error ? e.message : "Unknown error";
+  }
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>src/app/page.tsx</code>.
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+    <HomeContent dogBreeds={dogBreeds} catBreeds={catBreeds} error={error} />
   );
 }
