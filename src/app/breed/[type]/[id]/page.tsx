@@ -7,6 +7,8 @@ import {
 } from "../../../../types/breeds";
 import { DOG_API_KEY, CAT_API_KEY } from "../../../../constants/api";
 
+export type PageProps = { params: Promise<{ type: string; id: string }> };
+
 async function fetchDogBreed(id: string) {
   const res = await fetch(`https://api.thedogapi.com/v1/breeds`, {
     headers: {
@@ -61,7 +63,7 @@ async function fetchCatGallery(id: string) {
 export default async function BreedDetailPage({
   params,
 }: {
-  params: { type: string; id: string };
+  params: Promise<{ type: string; id: string }>;
 }) {
   const { type, id } = await params;
   let breed: DogBreedDetail | CatBreedDetail | null = null;
